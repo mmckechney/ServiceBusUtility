@@ -115,7 +115,7 @@ namespace ServiceBusUtility
             connectionCommand.Add(clearConnectionCommand);
 
             RootCommand rootCommand = new RootCommand(description: $"Utility to help you understand how to send and receive messages to a Service Bus Queue. " +
-                    $"{Environment.NewLine}The configuration for the the Service Bus is in the app config file");
+                    $"{Environment.NewLine}https://github.com/mmckechney/ServiceBusUtility");
             rootCommand.Add(connectionCommand);
             rootCommand.Add(queueCommand);
             rootCommand.Add(topicCommand);
