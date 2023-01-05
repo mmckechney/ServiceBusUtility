@@ -20,25 +20,28 @@ namespace ServiceBusUtility
             subscriptionNameOption.IsRequired = true;
 
             var messageCountOption = new Option<int>(new string[] { "--count", "-c" }, "Count of messages to add to the Service Bus Queue") { IsRequired = true };
-            var waitIntervalOption = new Option<int>(new string[] { "--wait", "-w" }, () => 10, "Wait interval (in milliseconds) between message sends");
+            var waitIntervalOption = new Option<int>(new string[] { "--wait", "-w" }, () => 0, "Wait interval (in milliseconds) between message sends");
             var delayOption = new Option<int>(new string[] { "--delay", "-d" }, () => 0, "Delay (schedule or reschedule) the message for X seconds in the future");
+            var quietOption = new Option<bool>(new string[] { "--quiet" }, () => false, "Don't output each individual \"Sent Message\" line");
 
             var queueSendCommand = new Command("send", "Send mesasages to a Service Bus queue");
-            queueSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings>(Program.SendMessages);
+            queueSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings, bool>(Program.SendMessages);
             queueSendCommand.Add(queueNameOption);
             queueSendCommand.Add(serviceBusNamespaceOption);
             queueSendCommand.Add(messageCountOption);
             queueSendCommand.Add(waitIntervalOption);
             queueSendCommand.Add(delayOption);
+            queueSendCommand.Add(quietOption);
 
             var topicSendCommand = new Command("send", "Send mesasages to a Service Bus topic/subscription");
-            topicSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings>(Program.SendMessages);
+            topicSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings,bool>(Program.SendMessages);
             topicSendCommand.Add(topicNameOption);
             topicSendCommand.Add(subscriptionNameOption);
             topicSendCommand.Add(serviceBusNamespaceOption);
             topicSendCommand.Add(messageCountOption);
             topicSendCommand.Add(waitIntervalOption);
             topicSendCommand.Add(delayOption);
+            topicSendCommand.Add(quietOption);
 
 
             var messageHandlingOption = new Option<MessageHandling>(new string[] { "--messagehandling", "--mh" }, () => MessageHandling.Complete, "How to treat messages retrieved from Queue");
@@ -114,7 +117,7 @@ namespace ServiceBusUtility
             connectionCommand.Add(setConnectionCommand);
             connectionCommand.Add(clearConnectionCommand);
 
-            RootCommand rootCommand = new RootCommand(description: $"Utility to help you understand how to send and receive messages to a Service Bus Queue. " +
+            RootCommand rootCommand = new RootCommand(description: $"Utility to help you send and receive test messages to a Service Bus Queue or Topic/Subscription. " +
                     $"{Environment.NewLine}https://github.com/mmckechney/ServiceBusUtility");
             rootCommand.Add(connectionCommand);
             rootCommand.Add(queueCommand);

@@ -4,6 +4,8 @@
     <TargetFramework>net7.0</TargetFramework>
     <RootNamespace>ServiceBusUtility</RootNamespace>
     <AssemblyName>sbu</AssemblyName>
+    <Version>2.0.0</Version>
+    <Authors>BlueSkyDev.us</Authors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.8.0" />

@@ -22,6 +22,7 @@ using System.Data;
 using Azure.Identity;
 using System.Net.Sockets;
 using System.IO;
+using System.Reflection.Metadata.Ecma335;
 
 namespace ServiceBusUtility
 {
@@ -161,35 +162,49 @@ namespace ServiceBusUtility
             Console.WriteLine($"{msgs.Count} messages peeked");
         }
 
-        internal static async Task SendMessages(int count, int wait, int delay, QueueType queueType, ServiceBusSettings sbSettings)
+        internal static async Task SendMessages(int count, int wait, int delay, QueueType queueType, ServiceBusSettings sbSettings, bool quiet)
         {
+            Stopwatch s = new Stopwatch();
+            
             try
             {
+                Console.WriteLine($"Starting send of {count} messages...");
                 Program.sbSettings = sbSettings;
                 Program.activeQueueOrTopic = queueType == QueueType.Queue ? sbSettings.QueueName : sbSettings.TopicName;
-                for (int i = 0; i < count; i++)
+                s.Start();
+
+                if (wait == 0)
                 {
-                    var message3 = new ServiceBusMessage($"This is a new test message for queue created at {DateTime.UtcNow}");
-                    string id = Guid.NewGuid().ToString();
-                    message3.MessageId = id;
-                    if (delay != 0)
+                    List<Task<string>> msgs = new List<Task<string>>();
+                    for (int i = 0; i < count; i++)
                     {
-                        message3.ScheduledEnqueueTime = DateTime.UtcNow.AddSeconds(delay);
+                        msgs.Add(SendMessage(i, delay, quiet));
                     }
+                    Task.WaitAll(msgs.ToArray());
 
-                    if (delay != 0)
+                    if (!quiet)
                     {
-                        var sequenceNumber = await Sender.ScheduleMessageAsync(message3, message3.ScheduledEnqueueTime);
-                        Console.WriteLine($"Loop {(i + 1).ToString().PadLeft(3, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'. Sequence #{sequenceNumber} scheduled for {message3.ScheduledEnqueueTime}");
+                        foreach (var t in msgs)
+                        {
+                            if (t.Result.Length > 0)
+                            {
+                                Console.WriteLine(t.Result);
+                            }
+                        }
                     }
-                    else
-                    {
-                        await Sender.SendMessageAsync(message3);
-                        Console.WriteLine($"Loop {(i + 1).ToString().PadLeft(3, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'.");
-                    }
-
-                    Thread.Sleep(wait);
                 }
+                else
+                {
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        var output = await SendMessage(i, delay, quiet);
+                        Console.WriteLine(output);
+                        Thread.Sleep(wait);
+                    }
+                }
+                s.Stop();
+                Console.WriteLine($"Sent {count} messages in {s.Elapsed.TotalSeconds.ToString("#.##")} seconds");
             }
             catch (Exception exe)
             {
@@ -197,6 +212,31 @@ namespace ServiceBusUtility
             }
         }
 
+        internal static async Task<string> SendMessage(int counter, int delay, bool quiet)
+        {
+            var sbMessages = new ServiceBusMessage($"This is a new test message for queue created at {DateTime.UtcNow}");
+            string id = Guid.NewGuid().ToString();
+            sbMessages.MessageId = id;
+
+            if (delay != 0)
+            {
+                sbMessages.ScheduledEnqueueTime = DateTime.UtcNow.AddSeconds(delay);
+                var sequenceNumber = await Sender.ScheduleMessageAsync(sbMessages, sbMessages.ScheduledEnqueueTime);
+                if (!quiet)
+                {
+                    return $"Loop {(counter + 1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'. Sequence #{sequenceNumber} scheduled for {sbMessages.ScheduledEnqueueTime.ToString("yyyy-MM-dd HH:mm:ss fff")}";
+                }
+            }
+            else
+            {
+                await Sender.SendMessageAsync(sbMessages);
+                if (!quiet)
+                {
+                    return $"Loop {(counter+1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'.";
+                }
+            }
+            return string.Empty;
+        }
         static MessageHandling handling;
         internal static async Task ReadMessage(MessageHandling messagehandling, long? sequenceNumber, QueueType queueType, int delay, bool scheduled, ServiceBusSettings sbSettings)
         {
