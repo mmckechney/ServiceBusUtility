@@ -30,7 +30,7 @@ Utility and sample code for accessing using Azure Service Bus
 
 ## Running
 
-After running the setup (above), you can send messages to the Service Bus by navigating to the output directory of the utility project `\ServiceBusUtility\ServiceBusUtility\bin\Debug\net6.0`
+After running the setup (above), you can send messages to the Service Bus by navigating to the output directory of the utility project `\ServiceBusUtility\ServiceBusUtility\bin\Debug\net7.0`
 
 From here, try running the send command
 
