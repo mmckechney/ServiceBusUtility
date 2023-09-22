@@ -49,15 +49,15 @@ namespace ServiceBusUtility
             {
                 if (_client == null)
                 {
-                    if (!string.IsNullOrWhiteSpace(sbSettings.SbNamespace))
+                    if (string.IsNullOrEmpty(connectionString) && !string.IsNullOrWhiteSpace(sbSettings.SbNamespace))
                     {
                         if (!sbSettings.SbNamespace.ToLower().EndsWith("servicebus.windows.net")) sbSettings.SbNamespace = sbSettings.SbNamespace + ".servicebus.windows.net";
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine("Using AAD RBAC authentication to connect to service bus...");
                         Console.ForegroundColor = ConsoleColor.White;
                         _client = new ServiceBusClient(sbSettings.SbNamespace, new AzureCliCredential());
-                    }  
-                    else
+                    }
+                    else if (!string.IsNullOrEmpty(connectionString))
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine("Using saved connection string to connect to service bus...");
@@ -65,9 +65,16 @@ namespace ServiceBusUtility
                         _client = new ServiceBusClient(connectionString);
 
                     }
+                    else
+                    {
+                        throw new ArgumentException("connectionString", "connectionString");
+                        //Console.ForegroundColor = ConsoleColor.Red;
+                        //Console.WriteLine("Either a saved connection string or a Service Bus Namespace are required");
+                        //Console.ForegroundColor = ConsoleColor.White;
+                        //Environment.Exit(-1);
+                     }
                 }
-                    return _client;
-                
+                return _client;
             }
         }
         static ServiceBusSender Sender
@@ -214,28 +221,36 @@ namespace ServiceBusUtility
 
         internal static async Task<string> SendMessage(int counter, int delay, bool quiet)
         {
-            var sbMessages = new ServiceBusMessage($"This is a new test message for queue created at {DateTime.UtcNow}");
-            string id = Guid.NewGuid().ToString();
-            sbMessages.MessageId = id;
+            try
+            {
+                var sbMessages = new ServiceBusMessage($"This is a new test message for queue created at {DateTime.UtcNow}");
+                string id = Guid.NewGuid().ToString();
+                sbMessages.MessageId = id;
 
-            if (delay != 0)
-            {
-                sbMessages.ScheduledEnqueueTime = DateTime.UtcNow.AddSeconds(delay);
-                var sequenceNumber = await Sender.ScheduleMessageAsync(sbMessages, sbMessages.ScheduledEnqueueTime);
-                if (!quiet)
+                if (delay != 0)
                 {
-                    return $"Loop {(counter + 1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'. Sequence #{sequenceNumber} scheduled for {sbMessages.ScheduledEnqueueTime.ToString("yyyy-MM-dd HH:mm:ss fff")}";
+                    sbMessages.ScheduledEnqueueTime = DateTime.UtcNow.AddSeconds(delay);
+                    var sequenceNumber = await Sender.ScheduleMessageAsync(sbMessages, sbMessages.ScheduledEnqueueTime);
+                    if (!quiet)
+                    {
+                        return $"Loop {(counter + 1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'. Sequence #{sequenceNumber} scheduled for {sbMessages.ScheduledEnqueueTime.ToString("yyyy-MM-dd HH:mm:ss fff")}";
+                    }
                 }
-            }
-            else
-            {
-                await Sender.SendMessageAsync(sbMessages);
-                if (!quiet)
+                else
                 {
-                    return $"Loop {(counter+1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'.";
+                    await Sender.SendMessageAsync(sbMessages);
+                    if (!quiet)
+                    {
+                        return $"Loop {(counter + 1).ToString().PadLeft(4, '0')}: Sent message '{id}' to '{activeQueueOrTopic}'.";
+                    }
                 }
+                return string.Empty;
             }
-            return string.Empty;
+            catch(Exception exe)
+            {
+                HandleServiceBusException(exe);
+                return string.Empty;
+            }
         }
         static MessageHandling handling;
         internal static async Task ReadMessage(MessageHandling messagehandling, long? sequenceNumber, QueueType queueType, int delay, bool scheduled, ServiceBusSettings sbSettings)

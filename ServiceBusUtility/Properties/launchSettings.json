@@ -15,6 +15,10 @@
     "Profile 1": {
       "commandName": "Project",
       "commandLineArgs": "topic read -t demotopic --sub demosub --ns mwmtesta2e3"
+    },
+    "HelpStart": {
+      "commandName": "Project",
+      "commandLineArgs": "topic send -t sqlbuildmanager --sub test -c 10"
     }
   }
 }
