@@ -11,68 +11,55 @@ param(
  $namespaceName
 )
 
+$error.Clear()
+$ErrorActionPreference = 'Stop'
 
-#Create or check for existing resource group
-$resourceGroup = Get-AzResourceGroup -Name $resourceGroupName -ErrorAction SilentlyContinue
-if(!$resourceGroup)
-{
-    Write-Host "Creating resource group '$resourceGroupName' in location '$location'" -ForegroundColor Cyan
-    New-AzResourceGroup -Name $resourceGroupName -Location $location
-}
-else
-{
-    Write-Host "Using existing resource group '$resourceGroupName'" -ForegroundColor Cyan
-}
+Write-Host "Creating Azure resources" -ForegroundColor Cyan
+$results = (az deployment sub create --location $location  --template-file ./infra/main.bicep --parameters location=$location resourceGroupName=$resourceGroupName serviceBusNamespaceName=$namespaceName) | ConvertFrom-Json -Depth 10
+		
+if(!$?){ exit }
 
-$serviceBusNameSpace = $namespaceName
-$serviceBusQueue = "demoqueue"
-$serviceBusTopic = "demotopic"
-$serviceBusSub = "demosub"
+$serviceBusNameSpace = $results.properties.outputs.serviceBusNamespaceName.value
+$serviceBusQueue = $results.properties.outputs.queueName.value
+$serviceBusTopic = $results.properties.outputs.topicName.value
+$serviceBusSub = $results.properties.outputs.subscriptionName.value
 
-# Start the deployment
-Write-Host "Starting deployment..." -ForegroundColor Cyan
-#####################################################
-# Create the Azure Resources 
-#####################################################
-if($null -eq (Get-AzServiceBusNamespace -ResourceGroupName $resourceGroupName -Name $serviceBusNameSpace -ErrorAction SilentlyContinue))
-{
-    Write-Host "Creating Service Bus Namespace: $($serviceBusNameSpace)"
-    New-AzServiceBusNamespace -ResourceGroupName $resourceGroupName -Name $serviceBusNameSpace -Location $location -SkuName  "Standard" 
-}
+$sbConnString = az servicebus namespace authorization-rule keys list -n "RootManageSharedAccessKey" --namespace-name $serviceBusNameSpace -g $resourceGroupName --query primaryConnectionString -o tsv
 
-if($null -eq (Get-AzServiceBusQueue -ResourceGroupName $resourceGroupName -Namespace $serviceBusNameSpace -Name $serviceBusQueue -ErrorAction SilentlyContinue))
-{
-    Write-Host "Creating Service Bus Queue: $($serviceBusQueue)"
-    New-AzServiceBusQueue -ResourceGroupName $resourceGroupName -Name $serviceBusQueue -Namespace $serviceBusNameSpace
-}
+Write-Host "Building Service Bus Utility project" -ForegroundColor Cyan
+dotnet publish .
 
-if($null -eq (Get-AzServiceBusTopic -ResourceGroupName $resourceGroupName -Namespace $serviceBusNameSpace -Name $serviceBusTopic -ErrorAction SilentlyContinue))
-{
-    Write-Host "Creating Service Bus Topic : $($serviceBusTopic)"
-    New-AzServiceBusTopic -ResourceGroupName $resourceGroupName -Name $serviceBusTopic -Namespace $serviceBusNameSpace -EnablePartitioning $true
-}
-
-if($null -eq (Get-AzServiceBusSubscription -ResourceGroupName $resourceGroupName -Namespace $serviceBusNameSpace -Topic $serviceBusTopic -Name $serviceBusSub -ErrorAction SilentlyContinue))
-{
-    Write-Host "Creating Service Bus Topic Subscription : $($serviceBusSub)"
-    New-AzServiceBusSubscription -ResourceGroupName $resourceGroupName -Topic $serviceBusTopic -Name $serviceBusSub -Namespace $serviceBusNameSpace
-}`
-
-Write-Host "Deployment Complete" -ForegroundColor Cyan
-$sbString = (Get-AzServiceBusKey -ResourceGroupName $resourceGroupName -Namespace $serviceBusNameSpace -Name "RootManageSharedAccessKey").PrimaryConnectionString
-
-
+Write-Host "Setting connection string (run: `sbu connection clear` if you want to use RBAC authentication)" -ForegroundColor Cyan
+.\ServiceBusUtility\bin\Release\net8.0\win-x64\sbu.exe connection set -c $sbConnString
 
 #####################################################
 # Output the values for reference
 #####################################################
-Write-Output "You can use the following information when exercising the utility against your sample Service Bus:"
+Write-Host "You can use the following information when exercising the utility against your sample Service Bus:" -ForegroundColor Cyan
 
-
-Write-Output "For App Service settings:"
-Write-Host "Connection String: `t $sbString" -ForegroundColor Green
+Write-Host "For App Service settings:" -ForegroundColor Cyan
+Write-Host "Connection String: `t $sbConnString" -ForegroundColor Green
 Write-Host "Namespace Name: `t $serviceBusNameSpace" -ForegroundColor Green
 Write-Host "Queue Name: `t`t $serviceBusQueue" -ForegroundColor Green
 Write-Host "Topic Name: `t`t $serviceBusTopic" -ForegroundColor Green
 Write-Host "Subscription Name: `t $serviceBusSub" -ForegroundColor Green
 
+
+Write-Host "Asking for Admin escallation to create link to executable..." -ForegroundColor Cyan
+$exelinkPath = Join-Path -Path (Resolve-Path .).Path -ChildPath "sbu.exe"
+$exetargetPath = (Resolve-Path .\ServiceBusUtility\bin\Release\net8.0\win-x64\publish\sbu.exe).Path
+
+# Self-elevate the script if required
+if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+    if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
+     $CommandLine =  "New-Item -ItemType HardLink -Path $($exelinkPath)  -Target $($exetargetPath);"
+     Start-Process -FilePath PowerShell.exe -Verb Runas -WindowStyle Minimized -ArgumentList $CommandLine
+
+    }
+   }
+
+
+Write-Host "Setting connection string (run: `sbu connection clear` if you want to use RBAC authentication)" -ForegroundColor Blue
+.\sbu.exe connection set -c $sbConnString
+Write-Host "Running Service Bus Utility" -ForegroundColor Cyan
+.\sbu.exe -h
