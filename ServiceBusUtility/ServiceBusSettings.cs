@@ -1,64 +1,83 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Microsoft.Extensions.Configuration;
 using System.Configuration;
 namespace ServiceBusUtility
 {
-    public class ServiceBusSettings
-    {
-        public string SbNamespace { get; set; } = string.Empty;
+   public class ServiceBusSettings
+   {
+      IConfiguration config;
+      public ServiceBusSettings(IConfiguration config)
+      {
+         this.config = config;
+      }
 
-        private string _queueName = string.Empty;
-        public string QueueName
-        {
-            get
+      private string sbNamespace = string.Empty;
+      public string SbNamespace
+      {
+         get
+         {
+            if (string.IsNullOrWhiteSpace(sbNamespace) && config?["NamespaceName"] != null)
             {
-                if (string.IsNullOrWhiteSpace(_queueName))
-                {
-                    _queueName = ConfigurationManager.AppSettings["QueueName"];
-                }
-                return _queueName;
+               sbNamespace = config["NamespaceName"];
             }
-            set
+            return sbNamespace;
+         }
+         set
+         {
+            sbNamespace = value;
+         }
+      }
+      private string _queueName = string.Empty;
+      public string QueueName
+      {
+         get
+         {
+            if (string.IsNullOrWhiteSpace(_queueName) && config?["QueueName"] != null)
             {
-                _queueName = value;
+               _queueName = config["QueueName"];
             }
-        }
+            return _queueName;
+         }
+         set
+         {
+            _queueName = value;
+         }
+      }
 
-        private string _topicName = string.Empty;
-        public string TopicName
-        {
-            get
+      private string _topicName = string.Empty;
+      public string TopicName
+      {
+         get
+         {
+            if (string.IsNullOrWhiteSpace(_topicName) && config?["TopicName"] != null)
             {
-                if (string.IsNullOrWhiteSpace(_topicName))
-                {
-                    _topicName = ConfigurationManager.AppSettings["TopicName"];
-                }
-                return _topicName;
+               _topicName = config["TopicName"];
             }
-            set
-            {
-                _topicName = value;
-            }
-        }
+            return _topicName;
+         }
+         set
+         {
+            _topicName = value;
+         }
+      }
 
-        private string _subscriptionName = string.Empty;
-        public string SubscriptionName
-        {
-            get
+      private string _subscriptionName = string.Empty;
+     
+
+      public string SubscriptionName
+      {
+         get
+         {
+            if (string.IsNullOrWhiteSpace(_subscriptionName) && config?["SubscriptionName"] != null)
             {
-                if (string.IsNullOrWhiteSpace(_subscriptionName))
-                {
-                    _subscriptionName = ConfigurationManager.AppSettings["SubscriptionName"];
-                }
-                return _subscriptionName;
+               _subscriptionName = config["SubscriptionName"];
             }
-            set
-            {
-                _subscriptionName = value;
-            }
-        }
-    }
+            return _subscriptionName;
+         }
+         set
+         {
+            _subscriptionName = value;
+         }
+      }
+      public MessageHandling MessageHandling { get; set; } = MessageHandling.Complete;
+   }
 }

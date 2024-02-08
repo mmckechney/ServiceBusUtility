@@ -26,16 +26,24 @@ $serviceBusSub = $results.properties.outputs.subscriptionName.value
 
 $sbConnString = az servicebus namespace authorization-rule keys list -n "RootManageSharedAccessKey" --namespace-name $serviceBusNameSpace -g $resourceGroupName --query primaryConnectionString -o tsv
 
+$settings = @{
+    "Namespace" = $serviceBusNameSpace
+    "QueueName" = $serviceBusQueue
+    "TopicName" = $serviceBusTopic
+    "SubscriptionName" = $serviceBusSub
+    "NamespaceName" = $serviceBusNameSpace
+}
+Write-Host -ForegroundColor Green "Creating console app local.settings.json"
+$settings = ConvertTo-Json $settings -Depth 100
+$settings | Out-File -FilePath ".\ServiceBusUtility\local.settings.json"
+
 Write-Host "Building Service Bus Utility project" -ForegroundColor Cyan
 dotnet publish .
-
-Write-Host "Setting connection string (run: `sbu connection clear` if you want to use RBAC authentication)" -ForegroundColor Cyan
-.\ServiceBusUtility\bin\Release\net8.0\win-x64\sbu.exe connection set -c $sbConnString
 
 #####################################################
 # Output the values for reference
 #####################################################
-Write-Host "You can use the following information when exercising the utility against your sample Service Bus:" -ForegroundColor Cyan
+Write-Host "You can use the following information when exercising the utility against your sample Service Bus (they have also been saved in the local.settings.json file):" -ForegroundColor Cyan
 
 Write-Host "For App Service settings:" -ForegroundColor Cyan
 Write-Host "Connection String: `t $sbConnString" -ForegroundColor Green
@@ -59,7 +67,9 @@ if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
    }
 
 
+
 Write-Host "Setting connection string (run: `sbu connection clear` if you want to use RBAC authentication)" -ForegroundColor Blue
-.\sbu.exe connection set -c $sbConnString
+.\ServiceBusUtility\bin\Release\net8.0\win-x64\publish\sbu.exe connection set -c $sbConnString --exit
+
 Write-Host "Running Service Bus Utility" -ForegroundColor Cyan
-.\sbu.exe -h
+.\ServiceBusUtility\bin\Release\net8.0\win-x64\publish\sbu.exe

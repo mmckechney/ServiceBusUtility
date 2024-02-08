@@ -1,22 +1,33 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk;Microsoft.NET.Sdk.Publish">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>ServiceBusUtility</RootNamespace>
-    <AssemblyName>sbu</AssemblyName>
-    <Version>2.0.2</Version>
-    <Authors>BlueSkyDev.us</Authors>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.10.4" />
-    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.1" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.ServiceBus" Version="5.13.5" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-	  <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-	  <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
-	  <PackageReference Include="Spectre.Console" Version="0.48.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
-  </ItemGroup>
+   <PropertyGroup>
+      <OutputType>Exe</OutputType>
+      <TargetFramework>net8.0</TargetFramework>
+      <RootNamespace>ServiceBusUtility</RootNamespace>
+      <AssemblyName>sbu</AssemblyName>
+      <Version>2.0.2</Version>
+      <Authors>BlueSkyDev.us</Authors>
+      <PublishSingleFile>true</PublishSingleFile>
+      <SelfContained>true</SelfContained>
+   </PropertyGroup>
+   <ItemGroup>
+      <PackageReference Include="Azure.Identity" Version="1.10.4" />
+      <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.2" />
+
+
+
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+      <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+      <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
+      <PackageReference Include="Spectre.Console" Version="0.48.0" />
+      <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+   </ItemGroup>
+   <ItemGroup>
+     <None Update="local.settings.json">
+       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+     </None>
+   </ItemGroup>
 </Project>
