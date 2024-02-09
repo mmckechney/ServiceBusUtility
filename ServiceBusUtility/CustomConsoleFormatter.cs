@@ -78,37 +78,32 @@ namespace ServiceBusUtility
    {
       public static void LogInformation(this ILogger logger, string message, ConsoleColor color)
       {
-         message = message + " **COLOR:" + color.ToString();
-         logger.LogInformation(message);
+         logger.LogInformation(FormatMessage(message, color));
       }
 
       public static void LogDebug(this ILogger logger, string message, ConsoleColor color)
       {
-         message = message + " **COLOR:" + color.ToString();
-         logger.LogDebug(message);
+         logger.LogDebug(FormatMessage(message, color));
       }
 
       public static void LogError(this ILogger logger, string message, ConsoleColor color)
       {
-         message = message + " **COLOR:" + color.ToString();
-         logger.LogError(message);
+         logger.LogError(FormatMessage(message, color));
       }
 
       public static void LogWarning(this ILogger logger, string message, ConsoleColor color)
       {
-         message = message + " **COLOR:" + color.ToString();
-         logger.LogWarning(message);
+         logger.LogWarning(FormatMessage(message, color));
       }
 
       public static void LogCritical(this ILogger logger, string message, ConsoleColor color)
       {
-         message = message + " **COLOR:" + color.ToString();
-         logger.LogCritical(message);
+         logger.LogCritical(FormatMessage(message, color));
       }
 
       public static void LogTrace(this ILogger logger, string message, ConsoleColor color)
       {
-         logger.LogTrace(message);
+         logger.LogTrace(FormatMessage(message,color));
       }
 
       public static void LogInformation(this ILogger logger, Dictionary<string,ConsoleColor> messages)
@@ -148,6 +143,10 @@ namespace ServiceBusUtility
             formattedMessages += $"{message.Key} **COLOR:{message.Value.ToString()}|";
          }
          return formattedMessages;
+      }
+      private static string FormatMessage(string message, ConsoleColor color)
+      {
+         return message + " **COLOR:" + color.ToString();
       }
 
    }
