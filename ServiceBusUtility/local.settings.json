@@ -1,7 +1,7 @@
 {
-  "Namespace": "sbudemo",
-  "TopicName": "demotopic",
-  "NamespaceName": "sbudemo",
   "QueueName": "demoqueue",
-  "SubscriptionName": "demosub"
+  "SubscriptionName": "demosub",
+  "NamespaceName": "mimcke",
+  "TopicName": "demotopic",
+  "Namespace": "mimcke"
 }
