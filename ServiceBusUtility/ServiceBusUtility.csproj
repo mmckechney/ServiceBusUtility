@@ -10,20 +10,19 @@
       <SelfContained>true</SelfContained>
    </PropertyGroup>
    <ItemGroup>
-      <PackageReference Include="Azure.Identity" Version="1.13.2" />
-      <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.2" />
+      <PackageReference Include="Azure.Identity" Version="1.19.0" />
+      <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
 
 
 
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.1" />
-      <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-      <PackageReference Include="System.CommandLine.NamingConventionBinder" Version="2.0.0-beta4.22272.1" />
-      <PackageReference Include="Spectre.Console" Version="0.49.1" />
-      <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.1" />
-      <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.1" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.1" />
-      <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.1" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+      <PackageReference Include="System.CommandLine" Version="3.0.0-preview.2.26159.112" />
+      <PackageReference Include="Spectre.Console" Version="0.54.0" />
+      <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
+      <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
    </ItemGroup>
    <ItemGroup>
      <None Update="local.settings.json">

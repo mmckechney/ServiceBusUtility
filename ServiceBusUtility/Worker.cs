@@ -5,7 +5,7 @@ using System.Text;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.CommandLine.Parsing;
+using System.CommandLine;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Azure.Identity;
@@ -20,7 +20,7 @@ namespace ServiceBusUtility
 {
    internal class Worker : BackgroundService
    {
-      private static Parser rootParser;
+      private static RootCommand rootCommand;
       private static StartArgs startArgs;
       private static ILogger<Worker> log;
       private static IConfiguration config;
@@ -46,10 +46,10 @@ namespace ServiceBusUtility
       {
          connectionString = GetConnectionString();
          Directory.SetCurrentDirectory(Path.GetDirectoryName(System.AppContext.BaseDirectory));
-         rootParser = CommandBuilder.BuildCommandLine();
+         rootCommand = CommandBuilder.BuildCommandLine();
          string[] args = startArgs.Args;
          if (args.Length == 0) args = new string[] { "-h" };
-         int val = await rootParser.InvokeAsync(args);
+         int val = await rootCommand.Parse(args).InvokeAsync();
 
          while (true)
          {
@@ -76,7 +76,7 @@ namespace ServiceBusUtility
                return;
             }
             if (line.Length == 0) line = "-h";
-            val = await rootParser.InvokeAsync(line);
+            val = await rootCommand.Parse(line).InvokeAsync();
          }
       }
 
@@ -626,7 +626,7 @@ namespace ServiceBusUtility
          if(exit)
          { Environment.Exit(0); }
       }
-      internal static void ClearConnectionString(object obj)
+      internal static void ClearConnectionString()
       {
          var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
          var csFile = Path.Combine(appDataPath, "cs.txt");

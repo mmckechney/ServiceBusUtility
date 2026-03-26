@@ -1,145 +1,216 @@
 ﻿using Spectre.Console;
 using System;
 using System.CommandLine;
-using System.CommandLine.Builder;
 using System.CommandLine.Help;
-using System.CommandLine.NamingConventionBinder;
-using System.CommandLine.Parsing;
+using System.CommandLine.Invocation;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ServiceBusUtility
 {
    internal class CommandBuilder
    {
-      public static Parser BuildCommandLine()
+      public static RootCommand BuildCommandLine()
       {
-         var serviceBusNamespaceOption = new Option<string>(new string[] { "--ns", "--sb-namespace" }, "Service Bus namespace to use for AAD authentication");
-         var queueNameOption = new Option<string>(new string[] { "-q", "--queue-name" }, "Queue to Read or Send messages");
-         var topicNameOption = new Option<string>(new string[] { "-t", "--topic-name" }, "Topic to Read or Send messages");
-         var subscriptionNameOption = new Option<string>(new string[] { "--sub", "--subscription-name" }, "Topic to Read Send messages");
+         RootCommand rootCommand = new RootCommand(
+             $"Utility to help you send and receive test messages to a Service Bus Queue or Topic/Subscription. " +
+             $"{Environment.NewLine}https://github.com/mmckechney/ServiceBusUtility");
 
-         var messageCountOption = new Option<int>(new string[] { "--count", "-c" }, "Count of messages to add to the Service Bus Queue") { IsRequired = true };
-         var waitIntervalOption = new Option<int>(new string[] { "--wait", "-w" }, () => 0, "Wait interval (in milliseconds) between message sends");
-         var delayOption = new Option<int>(new string[] { "--delay", "-d" }, () => 0, "Delay (schedule or reschedule) the message for X seconds in the future");
-         var quietOption = new Option<bool>(new string[] { "--quiet" }, () => false, "Don't output each individual \"Sent Message\" line");
+         rootCommand.Add(BuildConnectionCommand());
+         rootCommand.Add(BuildQueueFamilyCommand("queue", "Interact with a Service Bus Queue", QueueType.Queue, isTopicBased: false));
+         rootCommand.Add(BuildQueueFamilyCommand("topic", "Interact with a Service Bus Topic/Subscription", QueueType.TopicSubscription, isTopicBased: true));
+         rootCommand.Add(BuildQueueFamilyCommand("queuedl", "Interact with a Service Bus Queue deadletter sub-queue", QueueType.DeadLetterQueue, isTopicBased: false));
+         rootCommand.Add(BuildQueueFamilyCommand("topicdl", "Interact with a Service Bus Topic/Subscription deadletter sub-queue", QueueType.DeadLetterSubscription, isTopicBased: true));
 
-         var queueSendCommand = new Command("send", "Send mesasages to a Service Bus queue");
-         queueSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings, bool>(Worker.SendMessages);
-         queueSendCommand.Add(queueNameOption);
-         queueSendCommand.Add(serviceBusNamespaceOption);
-         queueSendCommand.Add(messageCountOption);
-         queueSendCommand.Add(waitIntervalOption);
-         queueSendCommand.Add(delayOption);
-         queueSendCommand.Add(quietOption);
+         // Customize help to show FigletText banner
+         var helpOption = rootCommand.Options.OfType<HelpOption>().FirstOrDefault();
+         if (helpOption != null)
+         {
+            helpOption.Action = new FigletHelpAction();
+         }
 
-         var topicSendCommand = new Command("send", "Send mesasages to a Service Bus topic/subscription");
-         topicSendCommand.Handler = CommandHandler.Create<int, int, int, QueueType, ServiceBusSettings, bool>(Worker.SendMessages);
-         topicSendCommand.Add(topicNameOption);
-         topicSendCommand.Add(subscriptionNameOption);
-         topicSendCommand.Add(serviceBusNamespaceOption);
-         topicSendCommand.Add(messageCountOption);
-         topicSendCommand.Add(waitIntervalOption);
-         topicSendCommand.Add(delayOption);
-         topicSendCommand.Add(quietOption);
+         return rootCommand;
+      }
 
+      private static Command BuildQueueFamilyCommand(string name, string description, QueueType queueType, bool isTopicBased)
+      {
+         var command = new Command(name, description);
+         command.Add(BuildSendCommand(queueType, isTopicBased));
+         command.Add(BuildReadCommand(queueType, isTopicBased));
+         command.Add(BuildPeekCommand(queueType));
+         return command;
+      }
 
-         var messageHandlingOption = new Option<MessageHandling>(new string[] { "--messagehandling", "--mh" }, () => MessageHandling.Complete, "How to treat messages retrieved from Queue");
-         var messageIdOption = new Option<long?>(new string[] { "--num", "--sequence-number" }, "Sequence Number for specific message to read");
-         var isScheduledOption = new Option<bool>(new string[] { "--scheduled", "-s" }, "Whether or not to look for scheduled messages (valid only for 'topic' read or peek)");
-         var readQueueCommand = new Command("read", "Read messages from a Queue, with various ways to handle a message");
-         readQueueCommand.Handler = CommandHandler.Create<long?, QueueType, int, bool, ServiceBusSettings>(Worker.ReadMessage);
-         readQueueCommand.Add(queueNameOption);
-         readQueueCommand.Add(serviceBusNamespaceOption);
-         readQueueCommand.Add(messageHandlingOption);
-         readQueueCommand.Add(messageIdOption);
-         readQueueCommand.Add(delayOption);
-         readQueueCommand.Add(isScheduledOption);
+      private static Command BuildSendCommand(QueueType queueType, bool isTopicBased)
+      {
+         var nsOption = new Option<string>("--ns", ["--sb-namespace"]) { Description = "Service Bus namespace to use for AAD authentication" };
+         var countOption = new Option<int>("--count", ["-c"]) { Description = "Count of messages to add to the Service Bus Queue", Required = true };
+         var waitOption = new Option<int>("--wait", ["-w"]) { Description = "Wait interval (in milliseconds) between message sends", DefaultValueFactory = _ => 0 };
+         var delayOption = new Option<int>("--delay", ["-d"]) { Description = "Delay (schedule or reschedule) the message for X seconds in the future", DefaultValueFactory = _ => 0 };
+         var quietOption = new Option<bool>("--quiet") { Description = "Don't output each individual \"Sent Message\" line", DefaultValueFactory = _ => false };
 
-         var readTopicCommand = new Command("read", "Read messages from a Topic/ Subscriptiopn, with various ways to handle a message");
-         readTopicCommand.Handler = CommandHandler.Create<long?, QueueType, int, bool, ServiceBusSettings>(Worker.ReadMessage);
-         readTopicCommand.Add(topicNameOption);
-         readTopicCommand.Add(subscriptionNameOption);
-         readTopicCommand.Add(serviceBusNamespaceOption);
-         readTopicCommand.Add(messageHandlingOption);
-         readTopicCommand.Add(messageIdOption);
-         readTopicCommand.Add(delayOption);
-         readTopicCommand.Add(isScheduledOption);
+         string cmdDescription = isTopicBased ? "Send messages to a Service Bus topic/subscription" : "Send messages to a Service Bus queue";
+         var cmd = new Command("send", cmdDescription);
 
-         var peekCommand = new Command("peek", "Peek messages from a Service Bus");
-         peekCommand.Handler = CommandHandler.Create<int, QueueType, bool, ServiceBusSettings>(Worker.PeekMessages);
-         peekCommand.Add(new Option<int>(new string[] { "--count", "-c" }, () => 50, "Count of messages to peek from the Service Bus Queue"));
-         peekCommand.Add(isScheduledOption);
+         Option<string> queueOption = null;
+         Option<string> topicOption = null;
+         Option<string> subOption = null;
 
-         var queueCommand = new Command("queue", "Interact with a Service Bue Queue")
-            {
-                 new Option<QueueType>("queueType", () => QueueType.Queue) { IsHidden = true }
-            };
-         queueCommand.Add(queueSendCommand);
-         queueCommand.Add(readQueueCommand);
-         queueCommand.Add(peekCommand);
+         if (isTopicBased)
+         {
+            topicOption = new Option<string>("--topic-name", ["-t"]) { Description = "Topic to Read or Send messages" };
+            subOption = new Option<string>("--subscription-name", ["--sub"]) { Description = "Topic to Read Send messages" };
+            cmd.Add(topicOption);
+            cmd.Add(subOption);
+         }
+         else
+         {
+            queueOption = new Option<string>("--queue-name", ["-q"]) { Description = "Queue to Read or Send messages" };
+            cmd.Add(queueOption);
+         }
 
-         var queueDeadLetterCommand = new Command("queuedl", "Interact with a Service Bue Queue deadletter sub-queue")
-            {
-                 new Option<QueueType>("queueType", () => QueueType.DeadLetterQueue) { IsHidden = true }
-            };
-         queueDeadLetterCommand.Add(queueSendCommand);
-         queueDeadLetterCommand.Add(readQueueCommand);
-         queueDeadLetterCommand.Add(peekCommand);
+         cmd.Add(nsOption);
+         cmd.Add(countOption);
+         cmd.Add(waitOption);
+         cmd.Add(delayOption);
+         cmd.Add(quietOption);
 
-         var topicCommand = new Command("topic", "Interact with a Service Bus Topic/Subscription")
-            {
-                 new Option<QueueType>("queueType", () => QueueType.TopicSubscription) { IsHidden = true }
-            };
-         topicCommand.Add(topicSendCommand);
-         topicCommand.Add(readTopicCommand);
-         topicCommand.Add(peekCommand);
+         cmd.SetAction(async (parseResult) =>
+         {
+            var sbSettings = BuildServiceBusSettings(parseResult, nsOption, queueOption, topicOption, subOption);
+            await Worker.SendMessages(
+                parseResult.GetValue(countOption),
+                parseResult.GetValue(waitOption),
+                parseResult.GetValue(delayOption),
+                queueType,
+                sbSettings,
+                parseResult.GetValue(quietOption));
+         });
 
-         var topicDeadletterCommand = new Command("topicdl", "Interact with a Service Bus Topic/Subscription deadletter sub-queue")
-            {
-                 new Option<QueueType>("queueType", () => QueueType.DeadLetterSubscription) { IsHidden = true }
-            };
-         topicDeadletterCommand.Add(topicSendCommand);
-         topicDeadletterCommand.Add(readTopicCommand);
-         topicDeadletterCommand.Add(peekCommand);
+         return cmd;
+      }
 
+      private static Command BuildReadCommand(QueueType queueType, bool isTopicBased)
+      {
+         var nsOption = new Option<string>("--ns", ["--sb-namespace"]) { Description = "Service Bus namespace to use for AAD authentication" };
+         var messageHandlingOption = new Option<MessageHandling>("--messagehandling", ["--mh"]) { Description = "How to treat messages retrieved from Queue", DefaultValueFactory = _ => MessageHandling.Complete };
+         var messageIdOption = new Option<long?>("--num", ["--sequence-number"]) { Description = "Sequence Number for specific message to read" };
+         var delayOption = new Option<int>("--delay", ["-d"]) { Description = "Delay (schedule or reschedule) the message for X seconds in the future", DefaultValueFactory = _ => 0 };
+         var isScheduledOption = new Option<bool>("--scheduled", ["-s"]) { Description = "Whether or not to look for scheduled messages (valid only for 'topic' read or peek)" };
 
+         string cmdDescription = isTopicBased
+             ? "Read messages from a Topic/Subscription, with various ways to handle a message"
+             : "Read messages from a Queue, with various ways to handle a message";
+         var cmd = new Command("read", cmdDescription);
+
+         Option<string> queueOption = null;
+         Option<string> topicOption = null;
+         Option<string> subOption = null;
+
+         if (isTopicBased)
+         {
+            topicOption = new Option<string>("--topic-name", ["-t"]) { Description = "Topic to Read or Send messages" };
+            subOption = new Option<string>("--subscription-name", ["--sub"]) { Description = "Topic to Read Send messages" };
+            cmd.Add(topicOption);
+            cmd.Add(subOption);
+         }
+         else
+         {
+            queueOption = new Option<string>("--queue-name", ["-q"]) { Description = "Queue to Read or Send messages" };
+            cmd.Add(queueOption);
+         }
+
+         cmd.Add(nsOption);
+         cmd.Add(messageHandlingOption);
+         cmd.Add(messageIdOption);
+         cmd.Add(delayOption);
+         cmd.Add(isScheduledOption);
+
+         cmd.SetAction(async (parseResult) =>
+         {
+            var sbSettings = BuildServiceBusSettings(parseResult, nsOption, queueOption, topicOption, subOption, messageHandlingOption);
+            await Worker.ReadMessage(
+                parseResult.GetValue(messageIdOption),
+                queueType,
+                parseResult.GetValue(delayOption),
+                parseResult.GetValue(isScheduledOption),
+                sbSettings);
+         });
+
+         return cmd;
+      }
+
+      private static Command BuildPeekCommand(QueueType queueType)
+      {
+         var countOption = new Option<int>("--count", ["-c"]) { Description = "Count of messages to peek from the Service Bus Queue", DefaultValueFactory = _ => 50 };
+         var isScheduledOption = new Option<bool>("--scheduled", ["-s"]) { Description = "Whether or not to look for scheduled messages (valid only for 'topic' read or peek)" };
+
+         var cmd = new Command("peek", "Peek messages from a Service Bus");
+         cmd.Add(countOption);
+         cmd.Add(isScheduledOption);
+
+         cmd.SetAction(async (parseResult) =>
+         {
+            await Worker.PeekMessages(
+                parseResult.GetValue(countOption),
+                queueType,
+                parseResult.GetValue(isScheduledOption),
+                new ServiceBusSettings(null));
+         });
+
+         return cmd;
+      }
+
+      private static Command BuildConnectionCommand()
+      {
          var connectionCommand = new Command("connection", "Sets or clears a Service Bus Connection string. If no connection string is specified, Azure RBAC will be used.");
-         var exitOption = new Option<bool>(new string[] { "--exit", "-e" }, () => false, "Forces close of app after method runs") { IsHidden = true };
-         var connStringOption = new Option<string>(new string[] { "-c", "--connection-string" }, "Connection String to your Service Bus");
-         connStringOption.IsRequired = true;
-         var setConnectionCommand = new Command("set", "Sets the connection string for your target service bus")
-            {
-                connStringOption,
-                exitOption
-            };
-         setConnectionCommand.Handler = CommandHandler.Create<string, bool>(Worker.SetConnectionString);
+
+         var connStringOption = new Option<string>("--connection-string", ["-c"]) { Description = "Connection String to your Service Bus", Required = true };
+         var exitOption = new Option<bool>("--exit", ["-e"]) { Description = "Forces close of app after method runs", DefaultValueFactory = _ => false, Hidden = true };
+
+         var setConnectionCommand = new Command("set", "Sets the connection string for your target service bus");
+         setConnectionCommand.Add(connStringOption);
+         setConnectionCommand.Add(exitOption);
+         setConnectionCommand.SetAction((parseResult) =>
+         {
+            Worker.SetConnectionString(
+                parseResult.GetValue(connStringOption),
+                parseResult.GetValue(exitOption));
+         });
+
          var clearConnectionCommand = new Command("clear", "Clears a saved connection string");
-         clearConnectionCommand.Handler = CommandHandler.Create(Worker.ClearConnectionString);
+         clearConnectionCommand.SetAction((parseResult) =>
+         {
+            Worker.ClearConnectionString();
+         });
+
          connectionCommand.Add(setConnectionCommand);
          connectionCommand.Add(clearConnectionCommand);
 
-         RootCommand rootCommand = new RootCommand(description: $"Utility to help you send and receive test messages to a Service Bus Queue or Topic/Subscription. " +
-                 $"{Environment.NewLine}https://github.com/mmckechney/ServiceBusUtility");
-         rootCommand.Add(connectionCommand);
-         rootCommand.Add(queueCommand);
-         rootCommand.Add(topicCommand);
-         rootCommand.Add(queueDeadLetterCommand);
-         rootCommand.Add(topicDeadletterCommand);
+         return connectionCommand;
+      }
 
-         var parser = new CommandLineBuilder(rootCommand)
-           .UseDefaults()
-           .UseHelp(ctx =>
-           {
-              ctx.HelpBuilder.CustomizeLayout(_ => HelpBuilder.Default
-                                    .GetLayout()
-                                    .Prepend(
-                                        _ => AnsiConsole.Write(new FigletText("Service Bus Utility"))
-                                    ));
+      private static ServiceBusSettings BuildServiceBusSettings(ParseResult parseResult, Option<string> nsOption,
+          Option<string> queueOption = null, Option<string> topicOption = null, Option<string> subOption = null,
+          Option<MessageHandling> messageHandlingOption = null)
+      {
+         var settings = new ServiceBusSettings(null);
+         settings.SbNamespace = parseResult.GetValue(nsOption) ?? "";
+         if (queueOption != null) settings.QueueName = parseResult.GetValue(queueOption) ?? "";
+         if (topicOption != null) settings.TopicName = parseResult.GetValue(topicOption) ?? "";
+         if (subOption != null) settings.SubscriptionName = parseResult.GetValue(subOption) ?? "";
+         if (messageHandlingOption != null) settings.MessageHandling = parseResult.GetValue(messageHandlingOption);
+         return settings;
+      }
+   }
 
-           })
-           .Build();
-
-         return parser;
+   internal class FigletHelpAction : SynchronousCommandLineAction
+   {
+      public override int Invoke(ParseResult parseResult)
+      {
+         AnsiConsole.Write(new FigletText("Service Bus Utility"));
+         var defaultHelp = new HelpAction();
+         return defaultHelp.Invoke(parseResult);
       }
    }
 }
